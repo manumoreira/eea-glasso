@@ -25,15 +25,15 @@ library(corrplot)
 # ----------------------------------------------------------------------------
 
 # Ver directorio actual
-cat("Directorio de trabajo actual:", getwd(), "\n\n")
+# cat("Directorio de trabajo actual:", getwd(), "\n\n")
 
 # OPCIÓN A: Si el archivo está en el directorio de trabajo
-# edges <- read.csv("redinventada.txt", sep="\t", header=TRUE)
+edges <- read.csv("redinventada.txt", sep="\t", header=TRUE)
 
 # OPCIÓN B: Seleccionar archivo manualmente (más fácil)
-cat("Seleccioná el archivo redinventada.txt en la ventana que se abre...\n")
-archivo <- file.choose()
-edges <- read.csv(archivo, sep="\t", header=TRUE)
+#cat("Seleccioná el archivo redinventada.txt en la ventana que se abre...\n")
+#archivo <- file.choose()
+#edges <- read.csv(archivo, sep="\t", header=TRUE)
 
 # OPCIÓN C: Si preferís especificar la ruta completa, descomentá y modificá:
 # edges <- read.csv("C:/Users/TuUsuario/Documents/redinventada.txt", sep="\t", header=TRUE)
