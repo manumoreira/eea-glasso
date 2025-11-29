@@ -1,0 +1,113 @@
+source	target	label	categoria	Type
+58	255	escuchas		Undirected
+107	255	conyuge	familiar	Undirected
+217	255	nuera	familiar	Undirected
+218	255	sobrina politica	familiar	Undirected
+107	247	Compra-venta	otro_tipo	Undirected
+107	247	Testimonial 913	otro_tipo	Undirected
+58	244	escuchas		Undirected
+58	226	escuchas		Undirected
+58	226	conviviente	familiar	Undirected
+5	224	"soc	 mutuaes_1"		Undirected
+5	224	"soc	 mutuaes_1"		Undirected
+159	224	"soc	 mutuaes_1"		Undirected
+159	224	"soc	 mutuaes_1"		Undirected
+107	218	tío	familiar	Undirected
+107	217	madre	familiar	Undirected
+218	217	hermana	familiar	Undirected
+159	209	"soc	 mutuaes_1"		Undirected
+177	209	"soc	 mutuaes_1"		Undirected
+149	200	escuchas		Undirected
+137	193	escuchas		Undirected
+137	193	escuchas		Undirected
+137	193	pareja	familiar	Undirected
+124	177	escuchas		Undirected
+137	177	escuchas		Undirected
+137	177	escuchas		Undirected
+149	177	escuchas		Undirected
+159	177	escuchas		Undirected
+137	167	escuchas		Undirected
+137	162	escuchas		Undirected
+58	159	escuchas		Undirected
+124	159	escuchas		Undirected
+137	159	escuchas		Undirected
+149	159	escuchas		Undirected
+124	153	escuchas		Undirected
+137	153	escuchas		Undirected
+137	153	escuchas		Undirected
+159	153	escuchas		Undirected
+137	149	escuchas		Undirected
+58	141	escuchas		Undirected
+137	141	escuchas		Undirected
+137	138	escuchas		Undirected
+137	138	escuchas		Undirected
+137	138	Hijo 2	familiar	Undirected
+36	137	portero	otro_tipo	Undirected
+58	137	escuchas		Undirected
+88	137	escuchas		Undirected
+124	137	escuchas		Undirected
+149	137	escuchas		Undirected
+137	136	escuchas		Undirected
+137	136	Hijo 1	familiar	Undirected
+58	124	escuchas		Undirected
+137	124	escuchas		Undirected
+58	107	Visita pabellon 7	otro_tipo	Undirected
+217	107	Hijo 2	familiar	Undirected
+218	107	sobrino	familiar	Undirected
+137	90	escuchas		Undirected
+159	90	conyuge	familiar	Undirected
+36	88	"soc	 mutuaes_1"		Undirected
+137	88	escuchas		Undirected
+58	80	Visita pabellon 7	otro_tipo	Undirected
+107	77	cuñado	familiar	Undirected
+217	77	yerno	familiar	Undirected
+124	73	escuchas		Undirected
+137	73	escuchas		Undirected
+159	73	escuchas		Undirected
+124	67	escuchas		Undirected
+137	67	escuchas		Undirected
+159	67	escuchas		Undirected
+137	65	escuchas		Undirected
+137	60	escuchas		Undirected
+58	59	escuchas		Undirected
+58	59	Hija 2	familiar	Undirected
+80	58	escuchas		Undirected
+107	58	escuchas		Undirected
+137	58	escuchas		Undirected
+226	58	conviviente	familiar	Undirected
+159	56	"soc	 mutuaes_1"		Undirected
+177	56	"soc	 mutuaes_1"		Undirected
+58	49	escuchas		Undirected
+149	49	escuchas		Undirected
+149	43	escuchas		Undirected
+137	42	"soc	 mutuaes_1"		Undirected
+137	41	"soc	 mutuaes_1"		Undirected
+138	41	"soc	 mutuaes_1"		Undirected
+137	40	"soc	 mutuaes_1"		Undirected
+43	39	"soc	 mutuaes_1"		Undirected
+43	38	"soc	 mutuaes_1"		Undirected
+43	37	"soc	 mutuaes_1"		Undirected
+43	35	"soc	 mutuaes_1"		Undirected
+149	34	"soc	 mutuaes_1"		Undirected
+43	33	"soc	 mutuaes_1"		Undirected
+149	32	"soc	 mutuaes_1"		Undirected
+43	31	"soc	 mutuaes_1"		Undirected
+43	30	"soc	 mutuaes_1"		Undirected
+2	29	"soc	 mutuaes_1"		Undirected
+58	29	"soc	 mutuaes_1"		Undirected
+43	28	"soc	 mutuaes_1"		Undirected
+43	27	"soc	 mutuaes_1"		Undirected
+43	26	"soc	 mutuaes_1"		Undirected
+3	25	"soc	 mutuaes_1"		Undirected
+43	25	"soc	 mutuaes_1"		Undirected
+226	24	Hija 1	familiar	Undirected
+226	23	Hija 2	familiar	Undirected
+141	20	conyuge	familiar	Undirected
+43	19	conyuge	familiar	Undirected
+136	17	madre	familiar	Undirected
+137	15	madre	familiar	Undirected
+58	10	Hija 1	familiar	Undirected
+226	10	Hijo 3	familiar	Undirected
+159	9	Hijo 2	familiar	Undirected
+159	8	Hijo 1	familiar	Undirected
+58	7	Hijo 3	familiar	Undirected
