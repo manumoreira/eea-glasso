@@ -131,7 +131,7 @@ cat("========== SELECCIONANDO GENES DE INTERÉS ==========\n")
 gene_info <- rowData(data)
 gene_symbols <- gene_info$gene_name
 
-# Genes de interés: BRCA1/2 y su top50 de vecinos a dos pasos
+# Genes de interés: BRCA1/2 y sus vecinos conocidos
 genes_of_interest <- c(
   "AASDH", "ABRAXAS1", "ABRAXAS2", "AGO2",  "ANAPC5",  "APEX1",  "ATM",  "ATP5F1D",  "AURKA",
   "BABAM1",  "BABAM2",  "BARD1",  "BCCIP",  "BRCA1",  "BRCA2",  "BRCC3",  "BRIP1",  "BRIX1",
@@ -140,7 +140,6 @@ genes_of_interest <- c(
   "CSTF1",  "DHX15",  "DHX32",  "DMC1",  "EIF3E",  "EIF6",  "EMSY",  "ERCC1",  "ERCC3",
   "FANCC",  "FANCD2",  "FANCE",  "FANCG",  "FANCI"
 )
-
 cat("Genes seleccionados:", length(genes_of_interest), "\n")
 
 # Encontrar índices de estos genes en la matriz
@@ -191,7 +190,7 @@ for(lam in lambda_values) {
 }
 
 # Seleccionar lambda óptimo (apuntamos a ~25-30% densidad)
-best_lambda_normal <- 0.4
+best_lambda_normal <- 0.2
 glasso_normal <- glasso_normal_list[[as.character(best_lambda_normal)]]
 
 n_genes <- ncol(cor_normal)
@@ -251,41 +250,89 @@ cat("  Conexiones encontradas:", n_edges_tumor, "\n")
 cat("  Densidad de red:", sprintf("%.1f%%", densidad_tumor*100), "\n\n")
 
 # ----------------------------------------------------------------------------
-# 6. DEFINIR GRUPOS FUNCIONALES PARA COLOREAR
+# 6. DETECCIÓN DE COMUNIDADES (CLUSTERING AUTOMÁTICO)
 # ----------------------------------------------------------------------------
 
-# Definir grupos de genes
-gene_groups <- list(
-  ancla = c("BRCA1", "BRCA2"),
-  supresores = c("TP53", "PTEN", "RB1", "ATM"),
-  reparacion = c("RAD51", "PALB2", "CHEK2", "BRIP1", "RAD50", "MRE11", "NBN", "FANCD2", "XRCC2"),
-  receptores = c("ESR1", "ESR2", "PGR", "ERBB2"),
-  ciclo = c("CDK4", "CCND1", "MDM2", "BAX", "BCL2"),
-  senalizacion = c("PIK3CA", "AKT1", "MTOR", "KRAS"),
-  metastasis = c("MMP9", "VEGFA", "CDH1")
-)
+cat("========== DETECTANDO COMUNIDADES EN LAS REDES ==========\n")
 
-# Asignar colores
-gene_colors <- rep("gray80", n_genes)
-names(gene_colors) <- colnames(cor_normal)
-
-color_map <- c(
-  ancla = "#E41A1C",        # Rojo intenso
-  supresores = "#377EB8",   # Azul
-  reparacion = "#4DAF4A",   # Verde
-  receptores = "#FF7F00",   # Naranja
-  ciclo = "#984EA3",        # Púrpura
-  senalizacion = "#F781BF", # Rosa
-  metastasis = "#A65628"    # Marrón
-)
-
-for(grupo in names(gene_groups)) {
-  genes_in_group <- intersect(gene_groups[[grupo]], colnames(cor_normal))
-  gene_colors[genes_in_group] <- color_map[grupo]
+# Función para detectar comunidades
+detect_communities <- function(precision_matrix, threshold=0.01) {
+  # Crear grafo desde matriz de precisión
+  adj <- (abs(precision_matrix) > threshold) * 1
+  diag(adj) <- 0
+  g <- graph_from_adjacency_matrix(adj, mode="undirected", weighted=TRUE)
+  
+  # Detectar comunidades usando Louvain
+  communities <- cluster_louvain(g)
+  
+  return(list(
+    communities = communities,
+    membership = membership(communities),
+    n_communities = length(unique(membership(communities))),
+    modularity = modularity(communities)
+  ))
 }
 
+# Detectar comunidades en tejido normal
+comm_normal <- detect_communities(glasso_normal$wi, threshold=0.01)
+cat("\n--- TEJIDO NORMAL ---\n")
+cat(sprintf("Comunidades detectadas: %d\n", comm_normal$n_communities))
+cat(sprintf("Modularidad: %.3f\n", comm_normal$modularity))
+
+# Mostrar composición de comunidades
+cat("\nComposición de comunidades:\n")
+for(i in 1:comm_normal$n_communities) {
+  genes_in_comm <- colnames(cor_normal)[comm_normal$membership == i]
+  cat(sprintf("  Comunidad %d (%d genes): %s\n", 
+              i, 
+              length(genes_in_comm),
+              paste(head(genes_in_comm, 5), collapse=", ")))
+  if(length(genes_in_comm) > 5) cat("    ...\n")
+}
+
+# Detectar comunidades en tejido tumoral
+comm_tumor <- detect_communities(glasso_tumor$wi, threshold=0.01)
+cat("\n--- TEJIDO TUMORAL ---\n")
+cat(sprintf("Comunidades detectadas: %d\n", comm_tumor$n_communities))
+cat(sprintf("Modularidad: %.3f\n", comm_tumor$modularity))
+
+# Mostrar composición de comunidades
+cat("\nComposición de comunidades:\n")
+for(i in 1:comm_tumor$n_communities) {
+  genes_in_comm <- colnames(cor_tumor)[comm_tumor$membership == i]
+  cat(sprintf("  Comunidad %d (%d genes): %s\n", 
+              i, 
+              length(genes_in_comm),
+              paste(head(genes_in_comm, 5), collapse=", ")))
+  if(length(genes_in_comm) > 5) cat("    ...\n")
+}
+
+# Asignar colores por comunidad
+# Usar paleta distinguible
+if(comm_normal$n_communities <= 8) {
+  palette_normal <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", 
+                      "#FF7F00", "#FFFF33", "#A65628", "#F781BF")
+} else {
+  palette_normal <- rainbow(comm_normal$n_communities, alpha=0.8)
+}
+
+if(comm_tumor$n_communities <= 8) {
+  palette_tumor <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", 
+                     "#FF7F00", "#FFFF33", "#A65628", "#F781BF")
+} else {
+  palette_tumor <- rainbow(comm_tumor$n_communities, alpha=0.8)
+}
+
+colors_normal <- palette_normal[comm_normal$membership]
+names(colors_normal) <- colnames(cor_normal)
+
+colors_tumor <- palette_tumor[comm_tumor$membership]
+names(colors_tumor) <- colnames(cor_tumor)
+
+cat("\n✓ Comunidades detectadas y colores asignados\n\n")
+
 # ----------------------------------------------------------------------------
-# 7. VISUALIZACIÓN: COMPARACIÓN DE REDES CON COLORES
+# 7. VISUALIZACIÓN: COMPARACIÓN DE REDES
 # ----------------------------------------------------------------------------
 
 cat("========== GENERANDO VISUALIZACIONES ==========\n")
@@ -316,10 +363,10 @@ corrplot(prec_tumor_norm, method="color", type="upper",
          mar=c(0,0,2,0), tl.cex=0.6, tl.col="black")
 
 # ----------------------------------------------------------------------------
-# 8. REDES COMO GRAFOS CON COLORES POR GRUPO FUNCIONAL
+# 8. REDES COMO GRAFOS CON COMUNIDADES DETECTADAS
 # ----------------------------------------------------------------------------
 
-cat("\nGenerando visualizaciones de redes con grupos funcionales...\n")
+cat("\nGenerando visualizaciones de redes con comunidades detectadas...\n")
 
 # Red en tejido normal
 par(mfrow=c(1,2), mar=c(1,1,3,1))
@@ -327,36 +374,43 @@ par(mfrow=c(1,2), mar=c(1,1,3,1))
 qgraph(glasso_normal$wi,
        layout="spring",
        labels=colnames(cor_normal),
-       color=gene_colors,
-       title=sprintf("Red Génica - Tejido Normal\n(%d conexiones)", n_edges_normal),
+       color=colors_normal,
+       title=sprintf("Red Normal\n(%d comunidades, %d conexiones)", 
+                     comm_normal$n_communities, n_edges_normal),
        vsize=7,
        label.cex=0.7,
        cut=0.01,
-       legend=FALSE)
+       legend=FALSE,
+       groups=as.factor(comm_normal$membership),
+       eigenvalues=FALSE)
 
 # Red en tejido tumoral
 qgraph(glasso_tumor$wi,
        layout="spring",
        labels=colnames(cor_tumor),
-       color=gene_colors,
-       title=sprintf("Red Génica - Tejido Tumoral\n(%d conexiones)", n_edges_tumor),
+       color=colors_tumor,
+       title=sprintf("Red Tumoral\n(%d comunidades, %d conexiones)", 
+                     comm_tumor$n_communities, n_edges_tumor),
        vsize=7,
        label.cex=0.7,
        cut=0.01,
-       legend=FALSE)
+       legend=FALSE,
+       groups=as.factor(comm_tumor$membership),
+       eigenvalues=FALSE)
 
-# Agregar leyenda de colores
-par(mfrow=c(1,1), mar=c(1,1,3,1))
+# Agregar leyenda explicativa
+par(mfrow=c(1,1), mar=c(2,2,3,2))
 plot.new()
-legend("center", 
-       legend=c("BRCA1/2 (Ancla)", "Supresores Tumorales", "Reparación DNA", 
-                "Receptores Hormonales", "Ciclo Celular", "Señalización", "Metástasis"),
-       fill=c(color_map["ancla"], color_map["supresores"], color_map["reparacion"],
-              color_map["receptores"], color_map["ciclo"], color_map["senalizacion"],
-              color_map["metastasis"]),
-       title="Grupos Funcionales",
-       cex=1.2,
-       bty="n")
+text(0.5, 0.7, "Comunidades detectadas por algoritmo de Louvain", 
+     cex=1.5, font=2)
+text(0.5, 0.5, sprintf("Normal: %d comunidades (modularidad: %.3f)", 
+                       comm_normal$n_communities, comm_normal$modularity),
+     cex=1.2)
+text(0.5, 0.4, sprintf("Tumor: %d comunidades (modularidad: %.3f)", 
+                       comm_tumor$n_communities, comm_tumor$modularity),
+     cex=1.2)
+text(0.5, 0.2, "Los colores representan módulos funcionales identificados automáticamente\nbasados en la estructura de conectividad de la red GLASSO",
+     cex=1)
 
 # ----------------------------------------------------------------------------
 # 9. ANÁLISIS DE DIFERENCIAS
@@ -626,43 +680,3 @@ cat("- Comparar con subtipos moleculares de cáncer de mama\n")
 cat("- Evaluar asociación con supervivencia de pacientes\n\n")
 
 cat("========== FIN DEL ANÁLISIS ==========\n")
-
-
-# DEBUG
-
-# Ejecutá esto para ver las correlaciones en tus datos
-cat("\n=== TOP 15 CORRELACIONES CON BRCA1 (NORMAL) ===\n")
-if("BRCA1" %in% colnames(cor_normal)) {
-  brca1_cors <- cor_normal["BRCA1", ]
-  brca1_cors <- brca1_cors[names(brca1_cors) != "BRCA1"]
-  top15 <- sort(abs(brca1_cors), decreasing=TRUE)[1:15]
-  for(i in 1:length(top15)) {
-    cat(sprintf("%2d. %s (r=%.3f)\n", i, names(top15)[i], top15[i]))
-  }
-} else {
-  cat("BRCA1 no encontrado\n")
-}
-
-cat("\n=== TOP 15 CORRELACIONES CON BRCA1 (TUMOR) ===\n")
-if("BRCA1" %in% colnames(cor_tumor)) {
-  brca1_cors_t <- cor_tumor["BRCA1", ]
-  brca1_cors_t <- brca1_cors_t[names(brca1_cors_t) != "BRCA1"]
-  top15_t <- sort(abs(brca1_cors_t), decreasing=TRUE)[1:15]
-  for(i in 1:length(top15_t)) {
-    cat(sprintf("%2d. %s (r=%.3f)\n", i, names(top15_t)[i], top15_t[i]))
-  }
-} else {
-  cat("BRCA1 no encontrado\n")
-}
-
-# Ver cuáles de los genes de STRING están en tu dataset actual
-cat("\n=== GENES DE STRING (top score) EN TU DATASET ===\n")
-string_genes <- c("ATM", "TP53", "PALB2", "FANCD2", "MRE11", "BARD1", 
-                  "BRIP1", "TOPBP1", "BABAM1", "BABAM2")
-genes_presentes <- intersect(string_genes, colnames(cor_normal))
-genes_ausentes <- setdiff(string_genes, colnames(cor_normal))
-
-cat("Presentes en tu análisis:\n")
-print(genes_presentes)
-cat("\nAUSENTES de tu análisis:\n")
-print(genes_ausentes)
