@@ -33,11 +33,11 @@ cat("✓ Paquetes cargados\n\n")
 seed_genes <- c("BRCA1", "BRCA2")
 
 # Threshold de score en STRING (400 = 0.4, 700 = 0.7, 900 = 0.9)
-score_threshold <- 400  # Ajustá según qué tan estricto querés ser
+score_threshold <- 700  # Ajustá según qué tan estricto querés ser
 
 # Número máximo de vecinos por nodo en cada paso
 max_neighbors_step1 <- 30  # Vecinos directos de BRCA1/2
-max_neighbors_step2 <- 10  # Vecinos de cada vecino
+max_neighbors_step2 <- 20  # Vecinos de cada vecino
 
 cat("========== CONFIGURACIÓN ==========\n")
 cat("Genes semilla:", paste(seed_genes, collapse=", "), "\n")
@@ -266,8 +266,8 @@ for(i in 1:length(gene_list)) {
   }
   
   # No imprimir toda la lista si es muy larga
-  if(i == 20 && length(gene_list) > 25) {
-    cat(sprintf('  # ... y %d genes más (ver archivo CSV)\n', length(gene_list) - 20))
+  if(i == 50 && length(gene_list) > 50) {
+    cat(sprintf('  # ... y %d genes más (ver archivo CSV)\n', length(gene_list) - 10))
     break
   }
 }
