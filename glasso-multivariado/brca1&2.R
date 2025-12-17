@@ -1,6 +1,6 @@
 # ============================================================================
 # ANÁLISIS GLASSO: RED DE REPARACIÓN DNA EN CÁNCER DE MAMA
-# Dataset: TCGA-BRCA (solo muestras tumorales)
+# Dataset: TCGA-BRCA (solo muestras tumorales, solo Seq RNA)
 # Enfoque: Análisis profundo con exploración exhaustiva de lambda
 # ============================================================================
 
@@ -166,35 +166,31 @@ cat("Matriz de correlación:", dim(cor_tumor), "\n\n")
 
 cat("========== EXPLORACIÓN DE LAMBDA (CRITERIO BIOLÓGICO) ==========\n")
 
-# 1. Configuración del Grid
-# Ajustamos un poco el rango para tener más granularidad en la zona baja
+
 lambda_grid <- seq(0.05, 0.5, by=0.01) 
 genes_interes <- c("BRCA1", "BRCA2")
 
 cat("Probando", length(lambda_grid), "valores de lambda (", min(lambda_grid), "-", max(lambda_grid), ")\n\n")
 
-# 2. Estructura para guardar resultados
 glasso_results <- list()
 metrics <- data.frame(
   lambda = lambda_grid,
   n_edges = numeric(length(lambda_grid)),
   density = numeric(length(lambda_grid)),
-  brca1_conn = integer(length(lambda_grid)), # Nueva métrica
-  brca2_conn = integer(length(lambda_grid))  # Nueva métrica
+  brca1_conn = integer(length(lambda_grid)), 
+  brca2_conn = integer(length(lambda_grid)) 
 )
 
-# 3. Bucle de ejecución
 for(i in 1:length(lambda_grid)) {
   lam <- lambda_grid[i]
   
-  # Ejecutar GLASSO
   # penalize.diagonal=FALSE es importante para no alterar la varianza propia
   res <- glasso(cor_tumor, rho=lam, penalize.diagonal=FALSE)
   glasso_results[[i]] <- res
   
   # Procesar matriz de precisión para métricas
   wi <- res$wi
-  # ¡Crucial! Reasignar nombres para buscar los genes
+
   rownames(wi) <- rownames(cor_tumor)
   colnames(wi) <- colnames(cor_tumor)
   
@@ -206,7 +202,6 @@ for(i in 1:length(lambda_grid)) {
   density <- n_edges / (n_genes * (n_genes - 1) / 2)
   
   # Métricas Específicas (Supervivencia de Genes)
-  # Verificamos si el gen existe en la matriz antes de contar para evitar errores
   if("BRCA1" %in% rownames(wi)) {
     metrics$brca1_conn[i] <- sum(wi["BRCA1", ] != 0)
   }
@@ -217,7 +212,6 @@ for(i in 1:length(lambda_grid)) {
   metrics$n_edges[i] <- n_edges
   metrics$density[i] <- density
   
-  # Feedback en consola reducido
   if(i %% 5 == 0) {
     cat(sprintf("Lambda=%.2f | Densidad: %.1f%% | BRCA1: %d enlaces | BRCA2: %d enlaces\n", 
                 lam, density*100, metrics$brca1_conn[i], metrics$brca2_conn[i]))
@@ -231,14 +225,12 @@ cat("\n✓ Grid de lambdas completado\n\n")
 # ----------------------------------------------------------------------------
 
 # Buscamos lambdas donde AMBOS genes tengan al menos 11 conexiones
-indices_supervivencia <- which(metrics$brca1_conn > 13 & metrics$brca2_conn > 13)
+indices_supervivencia <- which(metrics$brca1_conn > 11 & metrics$brca2_conn > 11)
 
 if(length(indices_supervivencia) > 0) {
-  # Elegimos el lambda más alto (más estricto) que cumpla la condición
   best_idx <- max(indices_supervivencia)
   criterion_msg <- "Criterio: Máximo lambda con BRCA1 y BRCA2 conectados"
 } else {
-  # Fallback: Si no hay ninguno, usamos el de menor densidad (el primero)
   best_idx <- max(indices_supervivencia)
   criterion_msg <- "ALERTA: No se encontró lambda que conecte ambos genes. Usando mínimo."
 }
@@ -288,18 +280,17 @@ text(0.5, 0.2, "(Este valor equilibra limpieza\ncon retención biológica)", cex
 
 
 # ----------------------------------------------------------------------------
-# 5.2. VISUALIZACIÓN DE REDES (SHOWCASE)
+# 5.2. VISUALIZACIÓN DE REDES
 # ----------------------------------------------------------------------------
 # Muestro 3 estados: Uno laxo, el ÓPTIMO, y uno muy estricto
 par(mfrow=c(1,3), mar=c(2,2,3,1))
 lambdas_demo <- unique(sort(c(0.1, best_lambda, min(0.5, max(lambda_grid)))))
-# Aseguramos que el óptimo esté en el medio para comparar
+
 if(length(lambdas_demo) < 3) lambdas_demo <- c(lambdas_demo[1], best_lambda, lambdas_demo[2]) 
 
 for(lam in lambdas_demo) {
   idx <- which(metrics$lambda == lam)[1]
   prec_temp <- glasso_results[[idx]]$wi
-  # Recuperar nombres para el plot
   colnames(prec_temp) <- colnames(cor_tumor)
   
   titulo <- ifelse(lam == best_lambda, paste("★ ÓPTIMO λ=", lam), paste("λ=", lam))
@@ -318,6 +309,7 @@ for(lam in lambdas_demo) {
 # ----------------------------------------------------------------------------
 glasso_final <- glasso_results[[best_idx]]
 n_edges_final <- metrics$n_edges[best_idx]
+
 # ----------------------------------------------------------------------------
 # 6. DETECCIÓN DE COMUNIDADES
 # ----------------------------------------------------------------------------
@@ -449,8 +441,6 @@ plot_prec <- ggcorrplot(matriz_prec,
   theme(legend.position = "bottom",
         axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-# --- VISUALIZACIÓN FINAL ---
-
 print(plot_cor)
 print(plot_prec)
 
@@ -527,7 +517,7 @@ if(!is.null(brca1_neighbors) && !is.null(brca2_neighbors)) {
 }
 
 # ----------------------------------------------------------------------------
-# 9. ANÁLISIS DE ESTABILIDAD DE VECINDARIOS
+# 9. ANÁLISIS DE ESTABILIDAD DE VECINDARIOS [No incluido en el análisis]
 # ----------------------------------------------------------------------------
 
 cat("\n========== ESTABILIDAD DE VECINDARIOS ==========\n")
@@ -561,7 +551,7 @@ if(length(brca1_stability) > 0) {
 }
 
 # ----------------------------------------------------------------------------
-# 10. MÉTRICAS AVANZADAS DE RED
+# 10. MÉTRICAS DE RED
 # ----------------------------------------------------------------------------
 
 cat("\n========== MÉTRICAS DE RED (TOPOLOGÍA GLASSO) ==========\n")
@@ -691,7 +681,7 @@ cat(sprintf("Pares 'Verdad' (STRING Alto Score y presentes en TCGA): %d\n\n", to
 
 cat("========== DESGLOSE DE PÉRDIDAS ==========\n")
 
-# PASO 1: Culpa de los datos (Pearson bajo)
+# PASO 1: Pearson > 0.3
 loss_pearson <- truth_set %>% 
   filter(abs(Pearson_TCGA) < 0.3) %>% 
   arrange(desc(STRING_Score))
@@ -703,7 +693,7 @@ if(nrow(loss_pearson)>0) {
   print(head(loss_pearson[, c("GenA","GenB","STRING_Score","Pearson_TCGA")], 10))
 }
 
-# PASO 2: Culpa del modelo (Pearson bien, Glasso cero)
+# PASO 2: GLASSO
 pearson_thresh <- 0.3
 loss_glasso <- truth_set %>% 
   filter(abs(Pearson_TCGA) >= pearson_thresh & !Detected_Glasso) %>% 
@@ -745,7 +735,7 @@ cat(sprintf("3. Pasan filtro de Modelo (Glasso): %d (perdimos %d en este paso)\n
 cat(sprintf("4. Tasa de recuperación final: %.1f%%\n", (nrow(survivors)/total_truth)*100))
 
 # ----------------------------------------------------------------------------
-# 11.5. LISTA DE SOBREVIVIENTES (PARA VALIDACIÓN BIOLÓGICA)
+# 11.5. LISTA DE SOBREVIVIENTES
 # ----------------------------------------------------------------------------
 
 cat("\n========== DETALLE DE LAS CONEXIONES VALIDADAS ==========\n")
@@ -753,13 +743,11 @@ cat("\n========== DETALLE DE LAS CONEXIONES VALIDADAS ==========\n")
 if(nrow(survivors) > 0) {
   
   # Ordenamos por fuerza de interacción DIRECTA (Glasso Absoluto)
-  # Queremos ver cuáles son las relaciones más fuertes que tu modelo propuso
-  # y que además tienen respaldo bibliográfico.
   survivors_sorted <- survivors %>% 
     arrange(desc(abs(Glasso_Partial))) %>%
     dplyr::select(GenA, GenB, STRING_Score, Pearson_TCGA, Glasso_Partial)
   
-  # Mostramos el TOP 20 en consola para inspección rápida
+  # Mostramos el TOP 30 en consola para inspección rápida
   cat("Top 30 conexiones validadas (Ordenadas por fuerza en Glasso):\n")
   print(head(survivors_sorted, 30), row.names = FALSE)
   
@@ -774,7 +762,7 @@ if(nrow(survivors) > 0) {
   # Chequeo automático de parejas famosas
   parejas_famosas <- c("BRCA1_BARD1", "BRCA2_PALB2", "BRCA1_BRIP1", "BRCA1_MYC", "TP53_MDM2")
   
-  cat("\n--- Chequeo de 'Celebridades' (¿Están las obvias?) ---\n")
+  cat("\n--- Chequeo de 'Celebridades' ---\n")
   for(par in parejas_famosas) {
     genes <- unlist(strsplit(par, "_"))
     # Buscamos en ambos sentidos A-B o B-A
@@ -819,8 +807,7 @@ cat(sprintf("Total de conexiones en la red Glasso (Lambda=0.35): %d\n", nrow(df_
 
 # 2. CARGAR LO CONOCIDO (STRING)
 # ----------------------------------------------------
-# Usamos tu df_edges cargado anteriormente (que tiene el STRING_Score)
-# Filtramos solo las de alta confianza para ser justos
+# Usamos df_edges cargado anteriormente 
 known_interactions <- df_edges %>% 
   filter(STRING_Score >= 700) %>%
   dplyr::select(PairID, STRING_Score)
