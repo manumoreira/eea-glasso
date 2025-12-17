@@ -7,6 +7,7 @@
 #    https://shiny.posit.co/
 #
 
+
 library(shiny)
 library(tidyverse)
 library(data.table)
@@ -170,31 +171,20 @@ create_3d_graph <- function(PN, vars, selected_node = NULL,
   posiciones[, is_selected := (!is.null(selected_node) & var == selected_node)]
   posiciones[, is_neighbor := var %in% neighbors]
   
-  # ===============================
-  # AJUSTE DE NODOS PARA VISIBILIDAD
-  # ===============================
-  
   if (is.null(selected_node)) {
-    
-    # --- Red completa ---
-    posiciones[, marker_size := 12]      # nodos grandes
-    posiciones[, marker_opacity := 1]    # totalmente visibles
-    
+    posiciones[, marker_size := 12]
+    posiciones[, marker_opacity := 1]
   } else {
-    
-    # --- Nodo seleccionado ---
     posiciones[, marker_size := ifelse(
-      is_selected, 14,        # nodo clickeado bien grande
-      ifelse(is_neighbor, 10, # vecinos más visibles
-             6)               # resto más chico
+      is_selected, 14,
+      ifelse(is_neighbor, 10, 6)
     )]
     
     posiciones[, marker_opacity := ifelse(
-      is_selected | is_neighbor, 0.9,    # estrella visible
-      0.15                               # resto apagado pero aún clickable
+      is_selected | is_neighbor, 0.9,
+      0.15
     )]
   }
-  
   
   # Nodos
   fig <- fig %>%
@@ -215,19 +205,29 @@ create_3d_graph <- function(PN, vars, selected_node = NULL,
       hoverinfo = "text",
       showlegend = FALSE
     )
+
+  axis_off <- list(
+    title = "",
+    showgrid = FALSE,
+    zeroline = FALSE,
+    showline = FALSE,
+    showticklabels = FALSE,
+    ticks = "",
+    showspikes = FALSE
+  )
   
-  # Layout
   fig <- fig %>%
     layout(
       scene = list(
-        xaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
-        yaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
-        zaxis = list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
+        xaxis = axis_off,
+        yaxis = axis_off,
+        zaxis = axis_off,
         camera = list(eye = list(x = 1.5, y = 1.5, z = 1.5))
       ),
       showlegend = FALSE,
       hovermode = "closest"
     )
+  
   
   return(fig)
 }
@@ -271,6 +271,21 @@ ui <- fluidPage(
       tabsetPanel(
         
         #====================================================
+        # DATASET
+        #====================================================
+        tabPanel("Dataset",
+                 br(),
+                 h4("Información del Dataset"),
+                 textOutput("dataset_info"),
+                 br(),
+                 h5("Primeras 15 filas:"),
+                 div(
+                   style = "overflow-x: auto;",
+                   tableOutput("dataset_preview")
+                 )
+        ),
+        
+        #====================================================
         # MATRICES
         #====================================================
         tabPanel("Matrices",
@@ -301,7 +316,8 @@ ui <- fluidPage(
         # TABLA DE CONEXIONES PERDIDAS
         #====================================================
         tabPanel("Conexiones Perdidas",
-                 h4("Top 20 correlaciones fuertes que se pierden con este lambda"),
+                 h4("Top 20 correlaciones perdidas y sus mediadores"),
+                 p("Las variables en 'mediadores' son las que explican la correlación indirecta entre var1 y var2."),
                  tableOutput("tabla_perdidas")
         )
       )
@@ -334,6 +350,18 @@ server <- function(input, output, session) {
     colnames(PN) <- vars
     PN
   })
+  
+  #--------------------------------------------------------
+  # INFO DEL DATASET
+  #--------------------------------------------------------
+  output$dataset_info <- renderText({
+    paste0("El dataset contiene ", nrow(df), " filas y ", ncol(df), " columnas",
+           " (", length(vars), " variables numéricas)")
+  })
+  
+  output$dataset_preview <- renderTable({
+    head(df, 15)
+  }, striped = TRUE, hover = TRUE, bordered = TRUE)
   
   #--------------------------------------------------------
   # INFO DE EDGES
@@ -369,17 +397,24 @@ server <- function(input, output, session) {
   }, height = 650, width = 650)
   
   #--------------------------------------------------------
-  # HEATMAP PRECISIÓN GLASSO (PARCIAL)
+  # HEATMAP PRECISIÓN GLASSO (PARCIAL) - MEJORADO
   #--------------------------------------------------------
   output$heat_prec <- renderPlot({
-    corrplot(precision_norm(),
-             method="circle",
-             type="upper",
-             diag=FALSE,
-             tl.cex=1,
-             tl.col="black")
+    PN <- precision_norm()
+    
+    # Forzar diagonal a NA para mejor visualización
+    diag(PN) <- NA
+    
+    corrplot(PN,
+             method = "color",        # Cambiar a "color" en lugar de "circle"
+             type = "upper",
+             diag = FALSE,
+             tl.cex = 1,
+             tl.col = "black",
+             na.label = " ",
+             col = colorRampPalette(c("#6D9EC1", "white", "#E46726"))(200),  # Colores más contrastados
+             cl.lim = c(-1, 1))       # Rango fijo
   }, height = 650, width = 650)
-  
   #--------------------------------------------------------
   # GRAFO 3D CON PLOTLY (FILTRABLE POR NODO)
   #--------------------------------------------------------
@@ -404,14 +439,12 @@ server <- function(input, output, session) {
     click <- event_data("plotly_click", source = "graph3D")
     if (is.null(click)) return()
     
-    # reconstruimos edges para saber cuántos traces son aristas
     PN <- precision_norm()
     edges <- build_edge_list(PN, vars)
     n_edges <- nrow(edges)
     
-    # curveNumber: 0..(n_edges)  (último trace = nodos)
     if (!is.null(click$curveNumber) && click$curveNumber == n_edges) {
-      idx <- click$pointNumber + 1  # pointNumber es 0-based
+      idx <- click$pointNumber + 1
       if (idx >= 1 && idx <= length(vars)) {
         selected_node(vars[idx])
       }
@@ -419,30 +452,95 @@ server <- function(input, output, session) {
   })
   
   #--------------------------------------------------------
-  # TABLA TOP-10 CONEXIONES PERDIDAS
+  # TABLA CONEXIONES PERDIDAS CON MEDIADORES
   #--------------------------------------------------------
   output$tabla_perdidas <- renderTable({
     
     P <- precision_norm()
+    
+    # Construir lista de conexiones ACTIVAS (las que quedaron)
+    edges_activas <- build_edge_list(P, vars)
+    
+    # Crear grafo de adyacencia para buscar caminos
+    adj_list <- list()
+    for (v in vars) {
+      vecinos <- unique(c(
+        edges_activas[from == v, to],
+        edges_activas[to == v, from]
+      ))
+      adj_list[[v]] <- vecinos
+    }
+    
+    # Función para encontrar mediadores (caminos de longitud 2)
+    encontrar_mediadores <- function(var1, var2, adj_list) {
+      if (is.null(adj_list[[var1]]) || is.null(adj_list[[var2]])) {
+        return(character(0))
+      }
+      
+      # Buscar nodos que conecten var1 y var2
+      vecinos1 <- adj_list[[var1]]
+      vecinos2 <- adj_list[[var2]]
+      
+      # Mediadores son los vecinos comunes
+      mediadores <- intersect(vecinos1, vecinos2)
+      
+      return(mediadores)
+    }
+    
+    # Crear tabla de correlaciones perdidas
     tabla <- data.table()
     
     for (i in 1:(nrow(P)-1)) {
       for (j in (i+1):ncol(P)) {
         perdida <- (abs(P[i,j]) < 1e-6)
-        tabla <- rbind(tabla,
-                       data.table(var1 = vars[i],
-                                  var2 = vars[j],
-                                  correlacion = m_cor[i,j],
-                                  perdida = perdida))
+        
+        if (perdida) {
+          var1 <- vars[i]
+          var2 <- vars[j]
+          
+          # Buscar mediadores
+          mediadores <- encontrar_mediadores(var1, var2, adj_list)
+          
+          # Si hay mediadores, construir string
+          mediadores_str <- if (length(mediadores) > 0) {
+            if (length(mediadores) <= 3) {
+              paste(mediadores, collapse = ", ")
+            } else {
+              paste0(paste(head(mediadores, 3), collapse = ", "), 
+                     " (y ", length(mediadores) - 3, " más)")
+            }
+          } else {
+            "sin mediadores directos"
+          }
+          
+          tabla <- rbind(tabla,
+                         data.table(
+                           var1 = var1,
+                           var2 = var2,
+                           correlacion = m_cor[i,j],
+                           mediadores = mediadores_str,
+                           n_mediadores = length(mediadores)
+                         ))
+        }
       }
     }
     
-    perdidas <- tabla[perdida == TRUE]
-    perdidas[, abs_cor := abs(correlacion)]
-    perdidas <- perdidas[order(-abs_cor)]
+    # Ordenar por correlación absoluta
+    tabla[, abs_cor := abs(correlacion)]
+    tabla <- tabla[order(-abs_cor)]
     
-    head(perdidas[,.(var1, var2, correlacion = round(correlacion, 4))], 10)
-  })
+    # Seleccionar top 20
+    resultado <- head(tabla[, .(
+      var1, 
+      var2, 
+      correlacion = round(correlacion, 4),
+      mediadores,
+      n_med = n_mediadores
+    )], 20)
+    
+    return(resultado)
+  }, striped = TRUE, hover = TRUE, bordered = TRUE)
 }
 
 shinyApp(ui = ui, server = server)
+
