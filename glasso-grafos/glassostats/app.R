@@ -2,10 +2,7 @@
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
 #
-# Find out more about building applications with Shiny here:
-#
-#    https://shiny.posit.co/
-#
+# La aplicación se encuentra en https://glasso-stats.shinyapps.io/glassostats/
 
 
 library(shiny)
@@ -543,4 +540,5 @@ server <- function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+
 
