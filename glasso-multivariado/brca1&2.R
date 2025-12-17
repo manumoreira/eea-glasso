@@ -400,18 +400,37 @@ colnames(matriz_prec) <- colnames(cor_tumor)
 
 # --- 3. GENERACIÓN DE GRÁFICOS ---
 
-# GRÁFICO 1: Correlación Estándar (Escala normal -1 a 1)
+library(ggcorrplot)
+library(ggplot2)
+
+# --- ESTRATEGIA PARA LOS LABELS ---
+# Obtenemos los nombres de las variables (asumiendo que están en las columnas)
+nombres_vars <- colnames(matriz_cor) 
+
+# Definimos un "salto" para no mostrar todos. 
+# Por ejemplo, 5 significa que mostrará el nombre 1, el 6, el 11, etc.
+# AJUSTA ESTE NÚMERO según la cantidad de variables que tengas.
+salto <- 5 
+breaks_visibles <- nombres_vars[seq(1, length(nombres_vars), by = salto)]
+
+# --- GRÁFICO 1: Correlación Estándar ---
 plot_cor <- ggcorrplot(matriz_cor, 
                        method = "square", 
                        type = "lower", 
-                       lab = FALSE,          # Sin números
-                       show.diag = FALSE,    # Ocultar diagonal (opcional, limpia más)
+                       lab = FALSE,           
+                       show.diag = FALSE,     
                        colors = c("navy", "white", "firebrick3"),
                        title = "Correlación (Pearson)",
                        tl.cex = 9
-) + theme(legend.position = "bottom") # Leyenda abajo para ahorrar espacio lateral
+) + 
+  # Aquí aplicamos el filtro de nombres a los ejes X e Y
+  scale_x_discrete(breaks = breaks_visibles) +
+  scale_y_discrete(breaks = breaks_visibles) +
+  theme(legend.position = "bottom",
+        # Opcional: rotar texto del eje X si aun así se tocan
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-# GRÁFICO 2: Precisión Glasso (Escala ajustada -0.5 a 0.5)
+# --- GRÁFICO 2: Precisión Glasso ---
 plot_prec <- ggcorrplot(matriz_prec, 
                         method = "square", 
                         type = "lower", 
@@ -420,20 +439,20 @@ plot_prec <- ggcorrplot(matriz_prec,
                         title = "Correlación Parcial (Glasso)",
                         tl.cex = 9
 ) + 
-  # AQUÍ ESTÁ EL TRUCO DE LA ESCALA:
-  # Sobreescribimos la escala de color por defecto de ggcorrplot
-  # 'limit = c(-0.5, 0.5)' hace que todo lo que pase de 0.5 sea rojo puro
-  # 'oob = scales::squish' asegura que no de error si hay valores mayores
   scale_fill_gradient2(low = "navy", high = "firebrick3", mid = "white", 
                        midpoint = 0, limit = c(-0.25, 0.25), 
-                       space = "Lab", name = "Corr") +
-  theme(legend.position = "bottom")
+                       space = "Lab", name = "Corr",
+                       oob = scales::squish) +
+  # Aplicamos el mismo filtro de nombres al segundo gráfico
+  scale_x_discrete(breaks = breaks_visibles) +
+  scale_y_discrete(breaks = breaks_visibles) +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
-# --- 4. VISUALIZACIÓN FINAL ---
+# --- VISUALIZACIÓN FINAL ---
 
-# Mostramos ambos gráficos en una misma ventana (1 fila, 2 columnas)
-grid.arrange(plot_cor, plot_prec, ncol = 2)
-
+print(plot_cor)
+print(plot_prec)
 
 # ----------------------------------------------------------------------------
 # 8. ANÁLISIS DE VECINDARIOS DE BRCA1/2
@@ -545,8 +564,6 @@ if(length(brca1_stability) > 0) {
 # 10. MÉTRICAS AVANZADAS DE RED
 # ----------------------------------------------------------------------------
 
-library(igraph)
-
 cat("\n========== MÉTRICAS DE RED (TOPOLOGÍA GLASSO) ==========\n")
 
 # 1. Crear objeto grafo desde tu matriz limpia
@@ -598,17 +615,19 @@ if("BRCA2" %in% df_metrics$Gen) {
 cat("========== VALIDACIÓN INTEGRAL: STRING vs TCGA vs GLASSO ==========\n")
 
 # ----------------------------------------------------------------------------
-# 11.1. CARGAR DATOS (CON CORRECCIÓN DPLYR)
+# 11.1. CARGAR DATOS
 # ----------------------------------------------------------------------------
+
 file_string <- "brca_ego_network_data.csv"
 if(!file.exists(file_string)) stop("Falta el archivo CSV de STRING.")
 
 df_string <- read.csv(file_string, stringsAsFactors = FALSE)
 
-# --- CORRECCIÓN AQUÍ: Usamos dplyr::select para evitar el error ---
+library(dplyr)
+
 df_edges <- df_string %>%
   filter(origin_gene != "SEED" & origin_gene != "From_Step1") %>% 
-  dplyr::select(GenA = origin_gene, GenB = gene_symbol, STRING_Score = score)
+  select(GenA = origin_gene, GenB = gene_symbol, STRING_Score = score)
 
 # ID único ordenado
 df_edges$PairID <- apply(df_edges[, c("GenA", "GenB")], 1, function(x) paste(sort(x), collapse = "_"))
@@ -666,7 +685,6 @@ total_truth <- nrow(truth_set)
 
 cat(sprintf("Pares 'Verdad' (STRING Alto Score y presentes en TCGA): %d\n\n", total_truth))
 
-
 # ----------------------------------------------------------------------------
 # 11.4. ANÁLISIS DE EMBUDO (PÉRDIDAS Y GANANCIAS)
 # ----------------------------------------------------------------------------
@@ -694,7 +712,7 @@ loss_glasso <- truth_set %>%
 cat(sprintf("\n2. PÉRDIDA POR MODELO (Pearson > 0.3 pero Glasso borró): %d (%.1f%%)\n", 
             nrow(loss_glasso), (nrow(loss_glasso)/total_truth)*100))
 if(nrow(loss_glasso)>0) {
-  cat("   Ejemplo: Correlaciones fuertes que Glasso consideró indirectas (o Lambda muy alto).\n")
+  cat("   Correlaciones fuertes que Glasso consideró indirectas.\n")
   print(head(loss_glasso[, c("GenA","GenB","Pearson_TCGA","Glasso_Partial")], 10))
 }
 
@@ -742,8 +760,8 @@ if(nrow(survivors) > 0) {
     dplyr::select(GenA, GenB, STRING_Score, Pearson_TCGA, Glasso_Partial)
   
   # Mostramos el TOP 20 en consola para inspección rápida
-  cat("Top 20 conexiones validadas (Ordenadas por fuerza en Glasso):\n")
-  print(head(survivors_sorted, 20), row.names = FALSE)
+  cat("Top 30 conexiones validadas (Ordenadas por fuerza en Glasso):\n")
+  print(head(survivors_sorted, 30), row.names = FALSE)
   
   # Guardamos todo en un CSV para que lo puedas poner en un Anexo de tu tesis
   archivo_salida <- "validcion_biologica_survivors.csv"
@@ -845,7 +863,7 @@ novel_checked <- novel_connections %>%
 cat("\n--- Detalle de las Novedades (Check de Score Bajo) ---\n")
 print(head(novel_checked[, c("GenA", "GenB", "Glasso_Partial", "Status")], 15))
 
-# 6. GUARDAR PARA TESIS
+# 6. GUARDAR 
 # ----------------------------------------------------
 write.csv(novel_checked, "glasso_novel_connections.csv", row.names = FALSE)
 cat("\n✓ Lista de conexiones novedosas guardada en 'glasso_novel_connections.csv'\n")
