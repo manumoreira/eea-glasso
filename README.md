@@ -8,6 +8,8 @@ Estos scripts fueron utilizados para realizar algunos breves videos presentando 
 
 Los videos pueden verse aquí: 
 
+https://www.youtube.com/playlist?list=PLaYcUefi_e2mH7eeIiWye6yEoCxFBMQPK
+
 ## Ejemplos
 
 ### Futbol stats
